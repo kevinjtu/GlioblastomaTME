@@ -49,6 +49,22 @@ nova_gsea <- list(
   )
 )
 
+cd58_gsea <- list(
+  cd58_gsea = c(
+    "COL4A1", "CD44", "DUSP1", "GADD45B",
+    "TNFRSF12A", "WWTR1", "PDLIM4", "XAF1",
+    "ABCC3", "ANXA2", "IL1RAP", "CCL2",
+    "METTL7B", "SERPINE1", "IGFBP3", "GBP2",
+    "NAMPT", "SOCS3", "PROS1", "ICAM1",
+    "CHI3L1", "FAM20C", "SLC39A14", "PLAU",
+    "SPOCD1", "ITGA5", "RDH10", "LZTS1",
+    "SRPX", "SRPX2", "EFEMP1", "FOSL2",
+    "TNC", "ITGA3", "ACTN1", "ANGPTL4",
+    "ADAMTS9", "OCIAD2", "CA12", "NPNT",
+    "EMP1", "PTX3", "GBP1", "CD58",
+    "TCIM", "CHI3L2", "UPP1", "PDPN"
+  )
+)
 
 
 # Combine all gene sets into one list
@@ -56,7 +72,37 @@ gene_set_list <- c(
   list(REACTOME_STING = sting_genes),
   niche_gsea,
   nova_gsea
+  #cd58_gsea
 )
+
+# Harmonize TMEM173/STING1 identifiers across all gene sets.
+# Gene symbols in geneSets must exactly match row names in exprData.
+gene_set_list <- lapply(gene_set_list, function(genes) {
+  genes[genes == "TMEM173"] <- "STING1"
+  unique(genes)
+})
+
+# Standardize each cohort's expression identifiers and audit gene-set coverage.
+prepare_ssgsea_matrix <- function(expr, cohort) {
+  if ("TMEM173" %in% rownames(expr)) {
+    if ("STING1" %in% rownames(expr)) {
+      stop(cohort, ": both TMEM173 and STING1 are present. Resolve duplicate gene identifiers before scoring.")
+    }
+    rownames(expr)[rownames(expr) == "TMEM173"] <- "STING1"
+  }
+  if (anyDuplicated(rownames(expr))) {
+    stop(cohort, ": duplicate gene identifiers detected in expression matrix.")
+  }
+  message(cohort, ": STING1 present = ", "STING1" %in% rownames(expr))
+  for (set_name in names(gene_set_list)) {
+    present <- intersect(gene_set_list[[set_name]], rownames(expr))
+    missing <- setdiff(gene_set_list[[set_name]], rownames(expr))
+    message("  ", set_name, ": ", length(present), "/",
+            length(gene_set_list[[set_name]]), " genes matched",
+            if (length(missing)) paste0("; missing: ", paste(missing, collapse = ", ")) else "")
+  }
+  expr
+}
 
 #TEMPUS RNAseq####
 # load the dataset
@@ -67,9 +113,7 @@ df <- tibble::column_to_rownames(df, var = "name")
 #get into correct data type
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "TEMPUS")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -111,9 +155,7 @@ df_tpm <- apply(df, 2, function(x) {
 #get into correct data type
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "TCGA RNAseq")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -159,9 +201,7 @@ colSums(tpm_df)
 #get into correct data type
 bulk <- as.data.frame(tpm_df)
 bulk_ma <- as.matrix(bulk)
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "IVYGAP")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -201,9 +241,7 @@ df <- tibble::column_to_rownames(df, var = "V1")
 #get into correct data type
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "Wu2020")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -235,9 +273,7 @@ df <- tibble::column_to_rownames(df, var = "Gene_Name")
 #get into correct data type
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "CGGA batch 2")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -270,9 +306,7 @@ df <- tibble::column_to_rownames(df, var = "Gene_Name")
 #get into correct data type
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "CGGA batch 1")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -304,9 +338,7 @@ df <- tibble::column_to_rownames(df, var = "Gene_symbol")
 #get into correct data type
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "GLASS")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -338,9 +370,7 @@ df <- tibble::column_to_rownames(df, var = "V1")
 #get into correct data type
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "G-SAM")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -372,9 +402,7 @@ df <- TCGA_GBM[["expr"]] %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "TCGA UG133A")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -406,9 +434,7 @@ df <- RDS[["expr"]] %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "Rembrandt")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -440,9 +466,7 @@ df <- RDS[["expr"]] %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "Gravendeel")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -477,9 +501,7 @@ df <- df %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "LeeY")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -512,9 +534,7 @@ df <- RDS[["expr"]] %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "Phillips")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -548,9 +568,7 @@ df <- RDS[["expr"]] %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "Freije")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -582,9 +600,7 @@ df <- RDS[["expr"]] %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "Murat")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -618,9 +634,7 @@ df <- RDS[["expr"]] %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "Joo")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
@@ -654,9 +668,7 @@ df <- RDS[["expr"]] %>%
 bulk <- as.data.frame(df)
 bulk_ma <- as.matrix(bulk)
 
-if ("TMEM173" %in% rownames(bulk_ma)) {
-  rownames(bulk_ma)[rownames(bulk_ma) == "TMEM173"] <- "STING1"
-}
+bulk_ma <- prepare_ssgsea_matrix(bulk_ma, "Ducray")
 
 params <- ssgseaParam(
   exprData = bulk_ma,
